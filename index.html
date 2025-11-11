@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Página pequeña - Simulación sin DB</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8}
+    *{box-sizing:border-box;font-family:Inter, system-ui, Arial, sans-serif}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#061426);color:#e6eef6;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+    .wrap{width:100%;max-width:760px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    .logo{width:56px;height:56px;background:linear-gradient(135deg,var(--accent),#7c3aed);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    h1{font-size:20px;margin:0}
+    p.lead{margin:4px 0 0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+    .card{background:rgba(255,255,255,0.03);padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.5)}
+
+    form .row{display:flex;gap:8px;margin-bottom:8px}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=text], input[type=number], textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{background:var(--accent);border:0;padding:10px 12px;border-radius:10px;color:#022;cursor:pointer;font-weight:600}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+    ul.list{list-style:none;padding:0;margin:0;max-height:52vh;overflow:auto}
+    li.item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;margin-bottom:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02))}
+    .meta{display:flex;flex-direction:column}
+    .meta strong{font-size:14px}
+    .meta small{color:var(--muted);font-size:12px}
+    .actions{display:flex;gap:6px}
+    .note{font-size:12px;color:var(--muted);margin-top:8px}
+
+    @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">SF</div>
+      <div>
+        <h1>Página pequeña — Simulación</h1>
+        <p class="lead">Formulario simple que guarda en localStorage (sin base de datos). Prueba agregar, editar y eliminar.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <form id="form">
+          <input type="hidden" id="id">
+          <div class="row">
+            <div style="flex:1">
+              <label for="name">Nombre</label>
+              <input id="name" type="text" placeholder="Ej. Ana Pérez" required>
+            </div>
+            <div style="width:110px">
+              <label for="age">Edad</label>
+              <input id="age" type="number" min="0" placeholder="20">
+            </div>
+          </div>
+
+          <div style="margin-bottom:8px">
+            <label for="note">Nota</label>
+            <textarea id="note" rows="3" placeholder="Algo breve..."></textarea>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="save">Guardar</button>
+            <button type="button" id="reset" class="ghost">Limpiar</button>
+            <div style="flex:1;text-align:right" class="note">Datos guardados en localStorage del navegador.</div>
+          </div>
+        </form>
+      </div>
+
+      <aside class="card">
+        <h3 style="margin-top:0">Registros</h3>
+        <ul id="list" class="list"></ul>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="clearAll" class="ghost">Eliminar todo</button>
+          <button id="export" class="ghost">Exportar JSON</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // Pequeña app sin base de datos — usa localStorage
+    const LS_KEY = 'simulacion_registros_v1'
+    const form = document.getElementById('form')
+    const nameIn = document.getElementById('name')
+    const ageIn = document.getElementById('age')
+    const noteIn = document.getElementById('note')
+    const idIn = document.getElementById('id')
+    const listEl = document.getElementById('list')
+    const saveBtn = document.getElementById('save')
+    const resetBtn = document.getElementById('reset')
+
+    function load(){
+      const raw = localStorage.getItem(LS_KEY)
+      try{ return raw ? JSON.parse(raw) : [] }catch(e){ return [] }
+    }
+    function persist(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)) }
+
+    function render(){
+      const items = load()
+      listEl.innerHTML = ''
+      if(items.length === 0){ listEl.innerHTML = '<li class="item" style="justify-content:center;color:var(--muted)">No hay registros.</li>'; return }
+      items.forEach(it => {
+        const li = document.createElement('li')
+        li.className = 'item'
+        li.innerHTML = `
+          <div class="meta">
+            <strong>${escapeHtml(it.name)}</strong>
+            <small>${it.age ? it.age + ' años — ' : ''}${escapeHtml(it.note || '')}</small>
+          </div>
+          <div class="actions">
+            <button data-id="${it.id}" class="ghost edit">Editar</button>
+            <button data-id="${it.id}" class="ghost del">Eliminar</button>
+          </div>`
+        listEl.appendChild(li)
+      })
+    }
+
+    function save(){
+      const items = load()
+      const id = idIn.value.trim()
+      if(!nameIn.value.trim()){ alert('Escribe un nombre'); return }
+      if(id){ // editar
+        const i = items.findIndex(x=>x.id===id)
+        if(i>-1){ items[i].name = nameIn.value.trim(); items[i].age = ageIn.value; items[i].note = noteIn.value.trim(); }
+      } else { // nuevo
+        items.unshift({ id: Date.now().toString(36), name: nameIn.value.trim(), age: ageIn.value, note: noteIn.value.trim() })
+      }
+      persist(items)
+      form.reset(); idIn.value = ''
+      render()
+    }
+
+    function edit(id){
+      const items = load()
+      const it = items.find(x=>x.id===id)
+      if(!it) return
+      idIn.value = it.id
+      nameIn.value = it.name
+      ageIn.value = it.age
+      noteIn.value = it.note
+      window.scrollTo({top:0,behavior:'smooth'})
+    }
+
+    function remove(id){
+      if(!confirm('Eliminar registro?')) return
+      const items = load().filter(x=>x.id!==id)
+      persist(items); render()
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"]+/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])) }
+
+    // Event bindings
+    form.addEventListener('submit', e=>{ e.preventDefault(); save() })
+    resetBtn.addEventListener('click', ()=>{ form.reset(); idIn.value = '' })
+    listEl.addEventListener('click', e=>{
+      const t = e.target
+      if(t.matches('.edit')) edit(t.dataset.id)
+      if(t.matches('.del')) remove(t.dataset.id)
+    })
+
+    document.getElementById('clearAll').addEventListener('click', ()=>{
+      if(confirm('Eliminar todos los registros?')){ localStorage.removeItem(LS_KEY); render() }
+    })
+
+    document.getElementById('export').addEventListener('click', ()=>{
+      const data = load()
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'registros.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+    })
+
+    // primera carga
+    render()
+  </script>
+</body>
+</html>
